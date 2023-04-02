@@ -224,6 +224,9 @@ impl<'a> GptDisk<'a> {
     /// the optimum partition location with the lowest block device.
     /// Returns the new partition id if there was sufficient room
     /// to add the partition. Size is specified in bytes.
+    ///
+    /// ## Panics
+    /// If size == 0.
     pub fn add_partition(
         &mut self,
         name: &str,
@@ -232,13 +235,10 @@ impl<'a> GptDisk<'a> {
         flags: u64,
         part_alignment: Option<u64>,
     ) -> io::Result<u32> {
+        assert!(size > 0);
+
         // Ceiling division which avoids overflow
-        let size_lba = size.checked_sub(1)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "size must be greater than zero bytes"))?
-            .checked_div(self.config.lb_size.into())
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "invalid logical block size caused bad division when calculating size in blocks"))?
-            .checked_add(1)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "size too large. must be within u64::MAX - 1 bounds"))?;
+        let size_lba = (size - 1) / self.config.lb_size.into() + 1;
 
         // Find the lowest lba that is larger than size.
         let free_sections = self.find_free_sectors();
