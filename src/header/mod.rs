@@ -15,6 +15,8 @@ use crate::disk;
 
 use simple_bytes::{BytesArray, BytesRead, BytesSeek, BytesWrite};
 
+const MIN_NUM_PARTS: u32 = 128;
+
 #[non_exhaustive]
 #[derive(Debug)]
 /// Errors returned when interacting with a header.
@@ -188,6 +190,16 @@ impl Header {
         Ok(len)
     }
 
+    /// Returns true if the num parts changes
+    pub(crate) fn num_parts_would_change(&self, partitions_len: u32) -> bool {
+        let n_num_parts = partitions_len.max(MIN_NUM_PARTS);
+        self.num_parts != n_num_parts
+    }
+
+    pub(crate) fn update_num_parts(&mut self, partitions_len: u32) {
+        self.num_parts = partitions_len.max(MIN_NUM_PARTS);
+    }
+
     fn to_bytes(&self, header_checksum: Option<u32>, partitions_checksum: Option<u32>) -> [u8; 92] {
         let mut bytes = BytesArray::from([0u8; 92]);
         let disk_guid_fields = self.disk_guid.as_fields();
@@ -349,6 +361,7 @@ pub(crate) fn file_read_header<D: Read + Seek>(
     }
 }
 
+/// get the backup position in lba
 pub(crate) fn find_backup_lba<D: Read + Seek>(
     f: &mut D,
     sector_size: disk::LogicalBlockSize,
